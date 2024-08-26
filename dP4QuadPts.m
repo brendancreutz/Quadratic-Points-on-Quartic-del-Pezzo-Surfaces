@@ -81,7 +81,7 @@ assert dQscrt eq c*d;
 
 
 ConditionsOnd := function(d);
-//Checks if d satisfies the conditions of [CV24] Theorem 1.6
+//Checks if d satisfies the conditions of [CV24, Theorem 6]
 	if d mod 12 ne 5 then 
 		return false;
 	end if;
@@ -251,8 +251,9 @@ end function;
 //CheckSdels(1000);
 //Previous line will check that the surfaces in [CV24,Theorem 6] have likely BM obstruction to quadratic points for all d < 1000.
 
-	
-
+////////////////
+////////////////
+//Below is code related to existence of degree 6 points on the surfaces Xd
 CubicPointsG := function(d,B);
 	// A function looks for k3-points on G, the symmetric square of Xd
 	// It checks for fibers of small height (related to B) where G has a point over k3
