@@ -1,5 +1,5 @@
 //dP4QuadPts.m
-//Brendan Creutz 23/09/2024
+//Brendan Creutz 28/08/2024
 /*
 This magma file contains code and computations and code related to the paper:
 [CV24] "Quartic del Pezzo surfaces without quadratic points" by Brendan Creutz and Bianca Viray, arXiv:2408.08436
@@ -81,7 +81,7 @@ assert dQscrt eq c*d;
 
 
 ConditionsOnd := function(d);
-//Checks if d satisfies the conditions of [CV24, Theorem 6]
+//Checks if d satisfies the conditions of [CV24] Theorem 1.6
 	if d mod 12 ne 5 then 
 		return false;
 	end if;
@@ -102,7 +102,7 @@ end function;
 
 CheckSdel := function(del2,del3);
 /* 
-Computes equations for the dP4 with discriminant (del2,del3) in k2*k3 and
+Computes equations for the dP4 with discriminant (del2,del3) in k2 x k3 and
 checks if there is a likely BM obstruction to quadratic points.
 */
 k2 := NumberField(Parent(del2));
@@ -116,39 +116,64 @@ K2 := A[1];
 K3 := A[2];
 assert Degree(K2) eq 2;
 del := (A! <del2,del3>) @@ toA;
-R<x1,x2,x3,u0,u1,u2,u3,u4> := PolynomialRing(L,8);
-RL,mRL := SwapExtension(R);
-M<t> := PolynomialRing(Rationals(),1);
-S<v0,v1,v2,v3,v4> := PolynomialRing(Rationals(),5);
-GetdP4fromDel := function(del);
-	eq1 := (x1-L.1*x3)*(x2-L.1*x3) - del*(u0+u1*L.1+u2*L.1^2+u3*L.1^3+u4*L.1^4)^2;
-	quadsu := Coefficients(mRL(eq1));
-	M1 := Eltseq(SymmetricMatrix(Evaluate(quadsu[4],[0,0,0,v0,v1,v2,v3,v4])));
-	M2 := Eltseq(SymmetricMatrix(Evaluate(quadsu[5],[0,0,0,v0,v1,v2,v3,v4])));
-	L1 := [ M1[i] : i in [1] cat [6,7] cat [11..13] cat [16..19] cat [21..25] ];
-	L2 := [ -M2[i] : i in [1] cat [6,7] cat [11..13] cat [16..19] cat [21..25]  ];
-	penM := Matrix(5,5,[ M1[i] + t*M2[i] : i in [1..#M1] ]);
-	return L1,L2,penM;
-end function;
-L1,L2,penM := GetdP4fromDel(del);
-c1 := LCM([Denominator(a) : a in L1 ]);
-c2 := LCM([Denominator(a) : a in L2 ]);
-L1 := [ c1*a : a in L1 ];
-L2 := [ c2*a : a in L2 ];
-Q1 := QuadraticForm(SymmetricMatrix(L1));
-Q2 := Parent(Q1)!QuadraticForm(SymmetricMatrix(L2));
-P4 := PolynomialRing(Integers(),5);
-Q0 := Evaluate(Q1,[P4.i : i in [1..5]]);
-Qinf := Evaluate(Q2,[P4.i : i in [1..5]]);
-qs := [Q0,Qinf];
-SingQs := Determinant(SymmetricMatrix(qs[1])+ T*SymmetricMatrix(qs[2]));
-fnew := Factorization(SingQs);
-f2new := fnew[1][1];
-f3new := fnew[2][1];
-k2new := NumberField(f2new);
-assert Degree(f2new) eq 2;
+k2 := NumberField(Parent(del2));
+k3 := NumberField(Parent(del3));
+f2 := DefiningPolynomial(k2);
+f3 := DefiningPolynomial(k3);
+assert IsSquare(Norm(del3));
+L := quo<Parent(f)|f>;
+A,toA := AbsoluteAlgebra(L : Fields := {k2,k3});
+K2 := A[1];
+K3 := A[2];
+assert Degree(K2) eq 2;
+del := (A! <del2,del3>) @@ toA;
+
+RR<x1,x2,x3,u0,u1,u2,u3,u4> := PolynomialRing(Rationals(),8);
+Qs := [];
+d0 := 0;
+for i in [1..NumberOfComponents(A)] do
+	K := A[i];
+	di := Degree(K);
+	R<x1,x2,x3,u0,u1,u2,u3,u4> := PolynomialRing(K,8);
+	RL,mRL := SwapExtension(R);
+	//Caution: the equation below may be incorrect if A has a degree 1 factor.
+	//K.i should be a root of the defining poly, but if the defining poly is linear K.1 = 1
+	eqi := (R.1-K.1*R.3)*(R.2-K.1*R.3) - toA(del)[i]*(&+[ R.(3+d0+j)*K.1^(j-1) : j in [1..di] ])^2;
+	d0 +:= di;
+	Qs cat:= [ RR ! q : q in Coefficients(mRL(eqi))];
+end for;
+Qs := Reduce(Qs);
+assert RR! Evaluate(Qs[4],[0,0,0,u0,u1,u2,u3,u4]) eq RR! Qs[4];
+assert RR! Evaluate(Qs[5],[0,0,0,u0,u1,u2,u3,u4]) eq RR! Qs[5];
+SS<u0,u1,u2,u3,u4> := PolynomialRing(Rationals(),5);
+qs := [ SS! Evaluate(Qs[j],[0,0,0,u0,u1,u2,u3,u4]) : j in [4..5] ];
+qs[1] *:= LCM([Denominator(a) : a in Coefficients(qs[1])]);
+qs[2] *:= LCM([Denominator(a) : a in Coefficients(qs[2])]);
+SS<u0,u1,u2,u3,u4> := PolynomialRing(Integers(),5);
+qs := MinimizeReduceDeg4delPezzo([ SS ! q : q in qs ]);
 P4Q<X0,X1,X2,X3,X4> := ProjectiveSpace(Rationals(),4);
 X := Scheme(P4Q,qs);
+printf "  Considering the surface X = %o\n",X;
+Q0 := qs[1];
+Qinf := qs[2];
+
+fnew := Determinant(SymmetricMatrix(qs[1])+ T*SymmetricMatrix(qs[2]));
+ffnew := Factorization(fnew);
+f2new := ffnew[1][1];
+f3new := ffnew[2][1];
+k2new := NumberField(f2new);
+k3new := NumberField(f3new);
+assert IsIsomorphic(k2new,k2);
+assert IsIsomorphic(k3new,k3);
+
+del2new := k2new ! del2;
+del3new := k3new ! del3;
+// Check that discriminants are still correct:
+Qsing2 := QuadraticForm(SymmetricMatrix(qs[1]) + k2new.1*SymmetricMatrix(qs[2]));
+assert IsSquare(del2new*&*Coefficients(QuadraticForm(Diagonalization(SymmetricMatrix(Qsing2)))));
+Qsing3 := QuadraticForm(SymmetricMatrix(qs[1]) + k3new.1*SymmetricMatrix(qs[2]));
+assert IsSquare(del3new*&*Coefficients(QuadraticForm(Diagonalization(SymmetricMatrix(Qsing3)))));
+printf "  For this model (S,del) is given by %o,%o and %o,%o\n",f2new,del2new,f3new,del3new;
 
 Qab := function(a,b);
 	// Returns the quadric bQ0 + aQinf
@@ -231,6 +256,9 @@ end function; //CheckSdel
 del2 := k2 ! -7;
 del3 := k3 ! k3.1;
 CheckSdel(del2,del3);
+//Shows that there is likely a BM obstruction to quadratic points on Xd for d = -7.
+CheckSdel(k2!-79,k3.1);
+//Shows that the evaluation map at p = 79 is surjective, so there is no BM obstruction to the existence of quadratic points on Xd for d = -79 (cf. [CV24, Remark 13]).
 */
 
 CheckSdels := function(N);
@@ -251,9 +279,7 @@ end function;
 //CheckSdels(1000);
 //Previous line will check that the surfaces in [CV24,Theorem 6] have likely BM obstruction to quadratic points for all d < 1000.
 
-////////////////
-////////////////
-//Below is code related to existence of degree 6 points on the surfaces Xd
+
 CubicPointsG := function(d,B);
 	// A function looks for k3-points on G, the symmetric square of Xd
 	// It checks for fibers of small height (related to B) where G has a point over k3
@@ -319,7 +345,7 @@ end function;
 
 /*
 The following function looks for k3-points on the BS-fibrations G associated to the surfaces Xd
-for d in [-N..N] satisfying the conditions of [CV24, Theorem 6] it looks for fibers of G -> P1 of small
+for d in [-N..N] satisfying the conditions of [CV24, Theorem 6]. It looks for fibers of G -> P1 of small
 height which contain k3-points.
 
 Data for N = 1000 is given after the function.
@@ -347,9 +373,9 @@ return deg6pts;
 end function;
 
 /*
-This gives pairs: [* d, [pts]] where
+The list below gives pairs: [* d, [pts]] where
 	d satisfies the conditions of [CV24, Theorem 6] and 
-	[pts] are coordinates of points in P^1(k3) where G_t(k3) is nonempty
+	[pts] are coordinates of some points in P^1(k3) where G_t(k3) is nonempty.
 	It gives such points for all |d| < 1000
 */
 deg6pts:=
@@ -1410,9 +1436,5 @@ deg6pts:=
         ]
     ]
 *] ];
-
-
-
-
 
 
